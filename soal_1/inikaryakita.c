@@ -153,28 +153,28 @@ static int fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t
 // Membaca isi file
 static int fs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
     (void) fi;
+    int fd;
     int result;
     char full_path[256];
     snprintf(full_path, sizeof(full_path), "%s%s", root_path, path);
 
-    FILE *file = fopen(full_path, "r");
-    if (!file)
+    fd = open(full_path, O_RDONLY);
+    if (fd == -1)
         return -errno;
 
-    if (strncmp(path, "/test", 5) == 0) {
+    if (strncmp(path, "/bahaya/test", 12) == 0) {
         // Baca filenya
-        fseek(file, 0, SEEK_END);
-        size_t length = ftell(file);
-        fseek(file, 0, SEEK_SET);
+        lseek(fd, 0, SEEK_END);
+        size_t length = lseek(fd, 0, SEEK_CUR);
+        lseek(fd, 0, SEEK_SET);
 
         char *file_buf = (char *)malloc(length);
         if (!file_buf) {
-            fclose(file);
+            close(fd);
             return -ENOMEM;
         }
 
-        fread(file_buf, 1, length, file);
-        fclose(file);
+        pread(fd, file_buf, length, 0);
 
         // Reverse filenya
         for (size_t i = 0; i < length / 2; ++i) {
@@ -183,24 +183,19 @@ static int fs_read(const char *path, char *buf, size_t size, off_t offset, struc
             file_buf[length - 1 - i] = temp;
         }
 
-        // Copy file reverse
+        // Copy reverse file
         size_t copy_size = (offset < length) ? (length - offset < size ? length - offset : size) : 0;
         memcpy(buf, file_buf + offset, copy_size);
 
         free(file_buf);
+        close(fd);
         return copy_size;
     } else {
-        // Baca file secara normal
-        if (fseek(file, offset, SEEK_SET) == -1) {
-            fclose(file);
-            return -errno;
-        }
-        result = fread(buf, 1, size, file);
-        fclose(file);
-
+        result = pread(fd, buf, size, offset);
         if (result == -1)
             result = -errno;
         
+        close(fd);
         return result;
     }
 }

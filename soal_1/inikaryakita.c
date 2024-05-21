@@ -27,6 +27,11 @@ int reverse_file_content(const char *path) {
     fseek(file, 0, SEEK_SET);
 
     char *content = (char *)malloc(length);
+    if (!content) {
+        fclose(file);
+        return -ENOMEM;
+    }
+
     fread(content, 1, length, file);
     
     for (long i = 0; i < length / 2; ++i) {
@@ -157,7 +162,7 @@ static int fs_read(const char *path, char *buf, size_t size, off_t offset, struc
         return -errno;
 
     if (strncmp(path, "/test", 5) == 0) {
-        // Baca file
+        // Baca filenya
         fseek(file, 0, SEEK_END);
         size_t length = ftell(file);
         fseek(file, 0, SEEK_SET);
@@ -171,14 +176,14 @@ static int fs_read(const char *path, char *buf, size_t size, off_t offset, struc
         fread(file_buf, 1, length, file);
         fclose(file);
 
-        // Reverse
+        // Reverse filenya
         for (size_t i = 0; i < length / 2; ++i) {
             char temp = file_buf[i];
             file_buf[i] = file_buf[length - 1 - i];
             file_buf[length - 1 - i] = temp;
         }
 
-        // Copy reverse file
+        // Copy file reverse
         size_t copy_size = (offset < length) ? (length - offset < size ? length - offset : size) : 0;
         memcpy(buf, file_buf + offset, copy_size);
 

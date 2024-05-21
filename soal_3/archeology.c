@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include <time.h>
 #include <stdbool.h>
+#include <syslog.h>
 
 // Global variables
 #define MAX_BUFFER 1024
@@ -48,6 +49,7 @@ static int arch_getattr(const char *path, struct stat *stbuf) {
     if (strcmp(path, "/") == 0) {
         stbuf->st_mode = S_IFDIR | 0755;
         stbuf->st_nlink = 2;
+        syslog(LOG_DEBUG, "getattr: root directory");
         return 0;
     }
 
@@ -57,6 +59,8 @@ static int arch_getattr(const char *path, struct stat *stbuf) {
     stbuf->st_mode = S_IFREG | 0644;
     stbuf->st_nlink = 1;
     stbuf->st_size = get_total_size(fpath);
+
+    syslog(LOG_DEBUG, "getattr: path=%s size=%ld", path, stbuf->st_size);
 
     return stbuf->st_size == 0 ? -ENOENT : 0;
 }
@@ -73,7 +77,10 @@ static int arch_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off
     build_full_path(fpath, path);
 
     DIR *dp = opendir(fpath);
-    if (!dp) return -errno;
+    if (!dp) {
+        syslog(LOG_ERR, "readdir: opendir failed for %s", fpath);
+        return -errno;
+    }
 
     struct dirent *de;
     while ((de = readdir(dp)) != NULL) {
@@ -92,6 +99,7 @@ static int arch_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off
     }
 
     closedir(dp);
+    syslog(LOG_DEBUG, "readdir: path=%s", path);
     return 0;
 }
 
@@ -130,6 +138,7 @@ static int arch_read(const char *path, char *buf, size_t size, off_t offset, str
         total_read += read_size;
         offset = 0;
     }
+    syslog(LOG_DEBUG, "read: path=%s size=%ld offset=%ld", path, total_read, offset);
     return total_read;
 }
 
@@ -151,7 +160,10 @@ static int arch_write(const char *path, const char *buf, size_t size, off_t offs
         fd = fopen(ppath, "r+b");
         if (!fd) {
             fd = fopen(ppath, "wb");
-            if (!fd) return -errno;
+            if (!fd) {
+                syslog(LOG_ERR, "write: open failed for %s", ppath);
+                return -errno;
+            }
         }
 
         fseek(fd, poffset, SEEK_SET);
@@ -165,6 +177,7 @@ static int arch_write(const char *path, const char *buf, size_t size, off_t offs
         total_write += write_size;
         poffset = 0;
     }
+    syslog(LOG_DEBUG, "write: path=%s size=%ld offset=%ld", path, total_write, offset);
     return total_write;
 }
 
@@ -181,9 +194,11 @@ static int arch_unlink(const char *path) {
         int res = unlink(ppath);
         if (res == -1) {
             if (errno == ENOENT) break;
+            syslog(LOG_ERR, "unlink: failed for %s", ppath);
             return -errno;
         }
     }
+    syslog(LOG_DEBUG, "unlink: path=%s", path);
     return 0;
 }
 
@@ -195,7 +210,13 @@ static int arch_create(const char *path, mode_t mode, struct fuse_file_info *fi)
     snprintf(fpath, sizeof(fpath), "%s%s.000", root_path, path);
 
     int res = creat(fpath, mode);
-    return res == -1 ? -errno : (close(res), 0);
+    if (res == -1) {
+        syslog(LOG_ERR, "create: failed for %s", fpath);
+        return -errno;
+    }
+    close(res);
+    syslog(LOG_DEBUG, "create: path=%s", path);
+    return 0;
 }
 
 // Function to truncate size
@@ -211,7 +232,10 @@ static int arch_truncate(const char *path, off_t size) {
         snprintf(ppath, sizeof(ppath), "%s.%03d", fpath, pcurrent++);
         size_t part_size = size_rmn > MAX_SPLIT ? MAX_SPLIT : size_rmn;
         int res = truncate(ppath, part_size);
-        if (res == -1) return -errno;
+        if (res == -1) {
+            syslog(LOG_ERR, "truncate: failed for %s", ppath);
+            return -errno;
+        }
         size_rmn -= part_size;
     }
 
@@ -220,10 +244,40 @@ static int arch_truncate(const char *path, off_t size) {
         int res = unlink(ppath);
         if (res == -1) {
             if (errno == ENOENT) break;
+            syslog(LOG_ERR, "truncate: unlink failed for %s", ppath);
             return -errno;
         }
     }
 
+    syslog(LOG_DEBUG, "truncate: path=%s size=%ld", path, size);
+    return 0;
+}
+
+// Function to create a directory
+static int arch_mkdir(const char *path, mode_t mode) {
+    char fpath[MAX_BUFFER];
+    build_full_path(fpath, path);
+
+    int res = mkdir(fpath, mode);
+    if (res == -1) {
+        syslog(LOG_ERR, "mkdir: failed for %s", fpath);
+        return -errno;
+    }
+    syslog(LOG_DEBUG, "mkdir: path=%s", path);
+    return 0;
+}
+
+// Function to remove a directory
+static int arch_rmdir(const char *path) {
+    char fpath[MAX_BUFFER];
+    build_full_path(fpath, path);
+
+    int res = rmdir(fpath);
+    if (res == -1) {
+        syslog(LOG_ERR, "rmdir: failed for %s", fpath);
+        return -errno;
+    }
+    syslog(LOG_DEBUG, "rmdir: path=%s", path);
     return 0;
 }
 
@@ -242,14 +296,19 @@ static struct fuse_operations arch_oper = {
     .unlink     = arch_unlink,
     .create     = arch_create,
     .truncate   = arch_truncate,
+    .mkdir      = arch_mkdir,
+    .rmdir      = arch_rmdir,
 };
 
 int main(int argc, char *argv[]) {
+    openlog("arch_fs", LOG_PID, LOG_USER);
     if (check_fuse_root_path() != 0) {
+        syslog(LOG_ERR, "Error: FUSE root path is not accessible.");
         fprintf(stderr, "Error: FUSE root path is not accessible.\n");
         return 1;
     }
     umask(0);
-    return fuse_main(argc, argv, &arch_oper, NULL);
+    int ret = fuse_main(argc, argv, &arch_oper, NULL);
+    closelog();
+    return ret;
 }
-

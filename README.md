@@ -303,11 +303,18 @@ int main(int argc, char *argv[]) {
 ```
 Memanggil `fuse_main` dengan argument `argc` dan `argv` yang diterima dari command line, serta menyertakan pointer ke struktur `fs_operations` yang telah didefinisikan sebelumnya. Fungsi `fuse_main` akan menginisialisasi FUSE dan menjalankan operasi filesystem yang telah ditentukan dalam `fs_operations`.
 
-Kemudian kita compile menggunakan `
+Kemudian kita compile menggunakan `gcc -Wall -o inikaryakita inikaryakita.c `pkg-config fuse --cflags --libs``.
+Setelah itu bikin directory baru untuk mountpointnya, disini saya mkdir `mnt`. Setelah itu kita run `./inikaryakita mnt` agar mountpoinnya jalan. Setelah kita run, nanti akan muncul folder bahaya dan gallery.
+Setelah itu kita masuk ke folder `/mnt/gallery` dan buat directory baru bernama `wm`. Setelah itu kita masuk ke folder `/mnt/gallery/wm` dan kita coba move fotonya ke folder wm agar dapat watermarknya.
+Setelah kita cek folder `gallery` kita pindah ke folder `bahaya`. Disitu kita cek apakah file `test-adfi.txt` nya sudah ke reverse atau belum.
+
+
 ## Dokumentasi Output
+![Screenshot from 2024-05-24 22-42-54](https://github.com/agnesgriselda/Sisop-4-2024-MH-IT10/assets/150429708/c566494a-a516-4a9c-ac5c-77d06c844714)
+![Screenshot from 2024-05-24 22-43-59](https://github.com/agnesgriselda/Sisop-4-2024-MH-IT10/assets/150429708/b4f50153-0d7d-4667-9a85-6729c370d80a)
+![Screenshot from 2024-05-24 22-44-11](https://github.com/agnesgriselda/Sisop-4-2024-MH-IT10/assets/150429708/f3f00957-a971-4ca5-94fa-7a609fe826ef)
+![Screenshot from 2024-05-24 22-44-26](https://github.com/agnesgriselda/Sisop-4-2024-MH-IT10/assets/150429708/d6c0c5c6-58df-4d8b-a35f-9cbb66d3b0ba)
 
-
-## Revisi
 
 ## Soal 3
 Seorang arkeolog menemukan sebuah gua yang didalamnya tersimpan banyak relik dari zaman praaksara, sayangnya semua barang yang ada pada gua tersebut memiliki bentuk yang terpecah belah akibat bencana yang tidak diketahui. Sang arkeolog ingin menemukan cara cepat agar ia bisa menggabungkan relik-relik yang terpecah itu, namun karena setiap pecahan relik itu masih memiliki nilai tersendiri, ia memutuskan untuk membuat sebuah file system yang mana saat ia mengakses file system tersebut ia dapat melihat semua relik dalam keadaan utuh, sementara relik yang asli tidak berubah sama sekali.

@@ -5,6 +5,295 @@
 - Muhammad __Nafi__ Firdaus (5027231045)
 - __Rafika__ Az Zahra Kusumastuti (5027231050)
 
+## Soal 1
+Adfi merupakan seorang CEO agency creative bernama Ini Karya Kita. Ia sedang melakukan inovasi pada manajemen project photography Ini Karya Kita. Salah satu ide yang dia kembangkan adalah tentang pengelolaan foto project dalam sistem arsip Ini Karya Kita. Dalam membangun sistem ini, Adfi tidak bisa melakukannya sendirian, dia perlu bantuan mahasiswa Departemen Teknologi Informasi angkatan 2023 untuk membahas konsep baru yang akan mengubah project fotografinya lebih menarik untuk dilihat. Adfi telah menyiapkan portofolio hasil project fotonya yang bisa didownload dan diakses di www.inikaryakita.id . Silahkan eksplorasi web Ini Karya Kita dan temukan halaman untuk bisa mendownload projectnya. Setelah kalian download terdapat folder gallery dan bahaya.
+- Pada folder “gallery”:
+      - Membuat folder dengan prefix "wm." Dalam folder ini, setiap gambar yang dipindahkan ke dalamnya akan diberikan watermark bertuliskan inikaryakita.id. 
+			  Ex: "mv ikk.jpeg wm-foto/" 
+        Output: 
+        Before: (tidak ada watermark bertuliskan inikaryakita.id)
+        After: (terdapat watermark tulisan inikaryakita.id)
+  - Pada folder "bahaya," terdapat file bernama "script.sh." Adfi menyadari pentingnya menjaga keamanan dan integritas data dalam folder ini.
+      - Mereka harus mengubah permission pada file "script.sh" agar bisa dijalankan, karena jika dijalankan maka dapat menghapus semua dan isi dari  "gallery"
+      - Adfi dan timnya juga ingin menambahkan fitur baru dengan membuat file dengan prefix "test" yang ketika disimpan akan mengalami pembalikan (reverse) isi dari file tersebut.
+
+## Penyelesaian
+# Soal 1 : inikaryakita.c
+Download `https://drive.google.com/file/d/1VP6o84AQfY6QbghFGkw6ghxkBbv7fpum/view` kemudian unzip. Setelah itu masukkan folder `portofolio` dalam folder `soal1-wm`. Kemudian buat script `inikaryakita.c` menggunakan operasi FUSE.
+
+```
+#define FUSE_USE_VERSION 30
+```
+Menentukan versi FUSE-nya, disini saya menggunakan versi 30.
+
+```
+#include <fuse.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <dirent.h>
+```
+Baris - baris di atas merupakan bagian untuk menyertakan header file yang diperlukan dalam program ini, seperti fuse.h untuk mengakses fungsi-fungsi FUSE, stdio.h untuk operasi input/output standar, stdlib.h untuk fungsi-fungsi utilitas umum, string.h untuk operasi string, errno.h untuk kode error, fcntl.h untuk operasi file control, sys/stat.h untuk informasi status file, unistd.h untuk operasi UNIX standar, dan dirent.h untuk operasi direktori.
+
+```
+static const char *root_path = "/home/pikaa/soal1-wm/portofolio";
+```
+Mendefinisikan variabel `root_path` yang menyimpan path root dari filesystem yang akan diakses oleh program, yaitu `/home/pikaa/soal1-wm/portofolio`.
+
+```
+int reverse_file_content(const char *path);
+```
+Deklarasi fungsi untuk membalik isi file, yang akan diimplementasikan nanti.
+
+```
+static void get_full_path(char *full_path, const char *path) {
+    snprintf(full_path, 256, "%s%s", root_path, path);
+}
+```
+Fungsi `get_full_path` digunakan untuk mendapatkan path lengkap suatu file atau direktori dengan menggabungkan `root_path` dan `path` yang diberikan sebagai parameter. Fungsi ini menggunakan `snprintf` untuk menggabungkan string dengan ukuran max 256.
+
+```
+static int fs_getattr(const char *path, struct stat *stbuf) {
+    int result;
+    char full_path[256];
+    get_full_path(full_path, path);
+
+    result = lstat(full_path, stbuf);
+    if (result == -1)
+        return -errno;
+
+    return 0;
+}
+```
+Fungsi `fs_getattr` digunakan untuk mendapatkan atribut suatu file atau direktori dengan memanggil fungsi `lstat`. Fungsi ini memanggil `get_full_path` untuk mendapatkan path lengkap, kemudian memanggil `lstat` untuk mengisi struktur stat dengan informasi file atau direktori tersebut. Jika terjadi error, fungsi ini akan mengembalikan nilai negatif dari errno.
+
+```
+static int fs_chmod(const char *path, mode_t mode) {
+    int result;
+    char full_path[256];
+    get_full_path(full_path, path);
+
+    result = chmod(full_path, mode);
+    if (result == -1)
+        return -errno;
+
+    return 0;
+}
+```
+Fungsi `fs_chmod` digunakan untuk mengubah permission (hak akses) suatu file atau direktori dengan memanggil fungsi `chmod`. Fungsi ini memanggil `get_full_path` untuk mendapatkan path lengkap, kemudian memanggil `chmod` untuk mengubah permission sesuai dengan mode yang diberikan. Jika terjadi error, fungsi ini akan mengembalikan nilai negatif dari errno.
+
+```
+int add_watermark(const char *path) {
+    char command[256];
+    snprintf(command, sizeof(command), "convert %s -gravity SouthEast -pointsize 36 -draw \"text 10,10 'inikaryakita.id'\" %s", path, path);
+    return system(command);
+}
+```
+Fungsi `add_watermark` digunakan untuk menambahkan watermark pada suatu file gambar dengan menggunakan perintah `convert` dari ImageMagick. Fungsi ini membuat string perintah dengan `snprintf` yang berisi perintah untuk menambahkan watermark `"inikaryakita.id"` dengan posisi di sudut kanan bawah dengan ukuran font 36. Kemudian, fungsi ini memanggil system untuk mengeksekusi perintah tersebut.
+
+```
+static int fs_rename(const char *from, const char *to) {
+    int result;
+    char full_from[256];
+    char full_to[256];
+    get_full_path(full_from, from);
+    get_full_path(full_to, to);
+
+    result = rename(full_from, full_to);
+    if (result == -1)
+        return -errno;
+
+    if (strncmp(to, "/gallery/", 9) == 0) {
+        add_watermark(full_to);
+    }
+
+    return 0;
+}
+```
+Fungsi `fs_rename` digunakan untuk memindahkan atau mengganti nama suatu file atau direktori dengan memanggil fungsi `rename`. Fungsi ini memanggil `get_full_path` untuk mendapatkan path lengkap dari `from` dan `to`, kemudian memanggil `rename` untuk memindahkan atau mengganti nama. Jika `to` diawali dengan `/gallery/`, maka fungsi `add_watermark` akan dipanggil untuk menambahkan watermark pada file tujuan tersebut. Jika terjadi error, fungsi ini akan mengembalikan nilai negatif dari errno.
+
+```
+static int fs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
+    (void) fi;
+    int fd;
+    int result;
+    char full_path[256];
+    get_full_path(full_path, path);
+
+    fd = open(full_path, O_WRONLY);
+    if (fd == -1)
+        return -errno;
+
+    result = pwrite(fd, buf, size, offset);
+    if (result == -1)
+        result = -errno;
+
+    close(fd);
+
+    if (strncmp(path, "/bahaya/test", 12) == 0) {
+        reverse_file_content(full_path);
+    }
+
+    return result;
+}
+```
+
+Fungsi `fs_write` digunakan untuk menulis data ke suatu file dengan memanggil fungsi `pwrite`. Fungsi ini memanggil `get_full_path` untuk mendapatkan path lengkap, kemudian membuka file dengan mode `O_WRONLY` (write only) dan memanggil `pwrite` untuk menulis data dari `buf` ke file tersebut dengan panjang size dan `offset` offset. Jika path diawali dengan `/bahaya/test`, maka fungsi `reverse_file_content` akan dipanggil untuk membalik isi file tersebut. Jika terjadi error, fungsi ini akan mengembalikan nilai negatif dari errno.
+
+```
+static int fs_mkdir(const char *path, mode_t mode) {
+    int result;
+    char full_path[256];
+    get_full_path(full_path, path);
+
+    result = mkdir(full_path, mode);
+    if (result == -1)
+        return -errno;
+
+    return 0;
+}
+```
+Fungsi `fs_mkdir` digunakan untuk membuat direktori baru dengan memanggil fungsi `mkdir`. Fungsi ini memanggil `get_full_path` untuk mendapatkan path lengkap
+
+```
+static int fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
+    (void) offset;
+    (void) fi;
+    char full_path[256];
+    get_full_path(full_path, path);
+
+    DIR *dp;
+    struct dirent *entry;
+    dp = opendir(full_path);
+    if (dp == NULL)
+        return -errno;
+
+    while ((entry = readdir(dp)) != NULL) {
+        struct stat st;
+        memset(&st, 0, sizeof(st));
+        st.st_ino = entry->d_ino;
+        st.st_mode = entry->d_type << 12;
+        if (filler(buf, entry->d_name, &st, 0))
+            break;
+    }
+
+    closedir(dp);
+    return 0;
+}
+```
+Fungsi `fs_readdir` digunakan untuk membaca isi dari suatu direktori. Parameter path menyimpan path direktori yang akan dibaca, `buf` adalah buffer untuk menyimpan isi direktori, `filler` adalah fungsi callback dari FUSE untuk mengisi buffer dengan entry direktori, `offset` adalah offset untuk pembacaan direktori, dan `fi` adalah informasi file. Fungsi ini memanggil `get_full_path` untuk mendapatkan path lengkap direktori, kemudian membuka direktori dengan opendir. Setelah itu, fungsi ini membaca setiap entry direktori dengan `readdir` dan memanggil `filler` untuk mengisi buffer dengan informasi entry tersebut. Setelah selesai, direktori ditutup dengan `closedir`.
+
+```
+int reverse_file_content(const char *path) {
+    FILE *file = fopen(path, "r+");
+    if (!file) return -errno;
+
+    fseek(file, 0, SEEK_END);
+    long length = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+    char *content = (char *)malloc(length);
+    if (!content) {
+        fclose(file);
+        return -ENOMEM;
+    }
+
+    fread(content, 1, length, file);
+    
+    for (long i = 0; i < length / 2; ++i) {
+        char temp = content[i];
+        content[i] = content[length - 1 - i];
+        content[length - 1 - i] = temp;
+    }
+
+    fseek(file, 0, SEEK_SET);
+    fwrite(content, 1, length, file);
+    fclose(file);
+    free(content);
+
+    return 0;
+}
+```
+Fungsi `reverse_file_content` digunakan untuk membalik isi dari suatu file. Parameter path menyimpan path file yang akan dibalik isinya. Fungsi ini membuka file dengan mode `"r+"` (read and write) menggunakan `fopen`. Kemudian, fungsi ini menggunakan `fseek` dan `ftell` untuk mendapatkan panjang file. Setelah itu, fungsi mengalokasikan memori dinamis dengan `malloc` untuk menyimpan isi file, lalu membaca isi file dengan `fread`. Selanjutnya, fungsi membalik isi file dengan menukar posisi setiap karakter di dalam array content. Terakhir, fungsi menulis kembali isi file yang telah dibalik dengan `fwrite`, menutup file dengan `fclose`, dan membebaskan memori yang dialokasikan dengan free.
+
+```
+static int fs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
+    (void) fi;
+    int fd;
+    int result;
+    char full_path[256];
+    get_full_path(full_path, path);
+
+    fd = open(full_path, O_RDONLY);
+    if (fd == -1)
+        return -errno;
+
+    if (strncmp(path, "/bahaya/test", 12) == 0) {
+        lseek(fd, 0, SEEK_END);
+        size_t length = lseek(fd, 0, SEEK_CUR);
+        lseek(fd, 0, SEEK_SET);
+
+        char *file_buf = (char *)malloc(length);
+        if (!file_buf) {
+            close(fd);
+            return -ENOMEM;
+        }
+
+        pread(fd, file_buf, length, 0);
+
+        for (size_t i = 0; i < length / 2; ++i) {
+            char temp = file_buf[i];
+            file_buf[i] = file_buf[length - 1 - i];
+            file_buf[length - 1 - i] = temp;
+        }
+
+        size_t copy_size = (offset < length) ? (length - offset < size ? length - offset : size) : 0;
+        memcpy(buf, file_buf + offset, copy_size);
+
+        free(file_buf);
+        close(fd);
+        return copy_size;
+    } else {
+        result = pread(fd, buf, size, offset);
+        if (result == -1)
+            result = -errno;
+        
+        close(fd);
+        return result;
+    }
+}
+```
+Fungsi `fs_read` digunakan untuk membaca isi dari suatu file. Parameter path menyimpan path file yang akan dibaca, `buf` adalah buffer untuk menyimpan isi file, `size` adalah ukuran maksimum data yang akan dibaca, `offset` adalah offset untuk pembacaan file, dan `fi` adalah informasi file. Fungsi ini memanggil `get_full_path` untuk mendapatkan path lengkap file, kemudian membuka file dengan mode `O_RDONLY` (read only) menggunakan `open`. Jika path diawali dengan `/bahaya/test`, maka fungsi akan membaca seluruh isi file, membalik isinya, dan menyalin isi file yang telah dibalik ke buffer `buf`. Jika bukan, fungsi akan membaca isi file secara normal dengan `pread`. Setelah selesai, file ditutup dengan `close`.
+
+```
+static struct fuse_operations fs_operations = {
+    .getattr = fs_getattr,
+    .chmod = fs_chmod,
+    .rename = fs_rename,
+    .write = fs_write,
+    .mkdir = fs_mkdir,
+    .readdir = fs_readdir,
+    .read = fs_read,
+};
+```
+Mendefinisikan struktur `fuse_operations` yang berisi pointer ke fungsi-fungsi yang diimplementasikan dalam program ini, seperti `fs_getattr`, `fs_chmod`, `fs_rename`, `fs_write`, `fs_mkdir`, `fs_readdir`, dan `fs_read`. Struktur ini diperlukan oleh FUSE untuk mengakses implementasi operasi filesystem yang disediakan oleh program ini.
+
+```
+int main(int argc, char *argv[]) {
+    return fuse_main(argc, argv, &fs_operations, NULL);
+}
+```
+Memanggil `fuse_main` dengan argument `argc` dan `argv` yang diterima dari command line, serta menyertakan pointer ke struktur `fs_operations` yang telah didefinisikan sebelumnya. Fungsi `fuse_main` akan menginisialisasi FUSE dan menjalankan operasi filesystem yang telah ditentukan dalam `fs_operations`.
+
+## Dokumentasi Output
+
+
+## Revisi
+
 ## Soal 3
 Seorang arkeolog menemukan sebuah gua yang didalamnya tersimpan banyak relik dari zaman praaksara, sayangnya semua barang yang ada pada gua tersebut memiliki bentuk yang terpecah belah akibat bencana yang tidak diketahui. Sang arkeolog ingin menemukan cara cepat agar ia bisa menggabungkan relik-relik yang terpecah itu, namun karena setiap pecahan relik itu masih memiliki nilai tersendiri, ia memutuskan untuk membuat sebuah file system yang mana saat ia mengakses file system tersebut ia dapat melihat semua relik dalam keadaan utuh, sementara relik yang asli tidak berubah sama sekali.
 

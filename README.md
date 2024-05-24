@@ -13,6 +13,7 @@ Adfi merupakan seorang CEO agency creative bernama Ini Karya Kita. Ia sedang mel
         Output: 
         Before: (tidak ada watermark bertuliskan inikaryakita.id)
         After: (terdapat watermark tulisan inikaryakita.id)
+  
   - Pada folder "bahaya," terdapat file bernama "script.sh." Adfi menyadari pentingnya menjaga keamanan dan integritas data dalam folder ini.
       - Mereka harus mengubah permission pada file "script.sh" agar bisa dijalankan, karena jika dijalankan maka dapat menghapus semua dan isi dari  "gallery"
       - Adfi dan timnya juga ingin menambahkan fitur baru dengan membuat file dengan prefix "test" yang ketika disimpan akan mengalami pembalikan (reverse) isi dari file tersebut.
@@ -44,10 +45,12 @@ static const char *root_path = "/home/pikaa/soal1-wm/portofolio";
 ```
 Mendefinisikan variabel `root_path` yang menyimpan path root dari filesystem yang akan diakses oleh program, yaitu `/home/pikaa/soal1-wm/portofolio`.
 
+
 ```c
 int reverse_file_content(const char *path);
 ```
 Deklarasi fungsi untuk membalik isi file, yang akan diimplementasikan nanti.
+
 
 ```c
 static void get_full_path(char *full_path, const char *path) {
@@ -55,6 +58,7 @@ static void get_full_path(char *full_path, const char *path) {
 }
 ```
 Fungsi `get_full_path` digunakan untuk mendapatkan path lengkap suatu file atau direktori dengan menggabungkan `root_path` dan `path` yang diberikan sebagai parameter. Fungsi ini menggunakan `snprintf` untuk menggabungkan string dengan ukuran max 256.
+
 
 ```c
 static int fs_getattr(const char *path, struct stat *stbuf) {
@@ -71,6 +75,7 @@ static int fs_getattr(const char *path, struct stat *stbuf) {
 ```
 Fungsi `fs_getattr` digunakan untuk mendapatkan atribut suatu file atau direktori dengan memanggil fungsi `lstat`. Fungsi ini memanggil `get_full_path` untuk mendapatkan path lengkap, kemudian memanggil `lstat` untuk mengisi struktur stat dengan informasi file atau direktori tersebut. Jika terjadi error, fungsi ini akan mengembalikan nilai negatif dari errno.
 
+
 ```c
 static int fs_chmod(const char *path, mode_t mode) {
     int result;
@@ -86,6 +91,7 @@ static int fs_chmod(const char *path, mode_t mode) {
 ```
 Fungsi `fs_chmod` digunakan untuk mengubah permission (hak akses) suatu file atau direktori dengan memanggil fungsi `chmod`. Fungsi ini memanggil `get_full_path` untuk mendapatkan path lengkap, kemudian memanggil `chmod` untuk mengubah permission sesuai dengan mode yang diberikan. Jika terjadi error, fungsi ini akan mengembalikan nilai negatif dari errno.
 
+
 ```c
 int add_watermark(const char *path) {
     char command[256];
@@ -94,6 +100,7 @@ int add_watermark(const char *path) {
 }
 ```
 Fungsi `add_watermark` digunakan untuk menambahkan watermark pada suatu file gambar dengan menggunakan perintah `convert` dari ImageMagick. Fungsi ini membuat string perintah dengan `snprintf` yang berisi perintah untuk menambahkan watermark `"inikaryakita.id"` dengan posisi di sudut kanan bawah dengan ukuran font 36. Kemudian, fungsi ini memanggil system untuk mengeksekusi perintah tersebut.
+
 
 ```c
 static int fs_rename(const char *from, const char *to) {
@@ -115,6 +122,7 @@ static int fs_rename(const char *from, const char *to) {
 }
 ```
 Fungsi `fs_rename` digunakan untuk memindahkan atau mengganti nama suatu file atau direktori dengan memanggil fungsi `rename`. Fungsi ini memanggil `get_full_path` untuk mendapatkan path lengkap dari `from` dan `to`, kemudian memanggil `rename` untuk memindahkan atau mengganti nama. Jika `to` diawali dengan `/gallery/`, maka fungsi `add_watermark` akan dipanggil untuk menambahkan watermark pada file tujuan tersebut. Jika terjadi error, fungsi ini akan mengembalikan nilai negatif dari errno.
+
 
 ```c
 static int fs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
@@ -144,6 +152,7 @@ static int fs_write(const char *path, const char *buf, size_t size, off_t offset
 
 Fungsi `fs_write` digunakan untuk menulis data ke suatu file dengan memanggil fungsi `pwrite`. Fungsi ini memanggil `get_full_path` untuk mendapatkan path lengkap, kemudian membuka file dengan mode `O_WRONLY` (write only) dan memanggil `pwrite` untuk menulis data dari `buf` ke file tersebut dengan panjang size dan `offset` offset. Jika path diawali dengan `/bahaya/test`, maka fungsi `reverse_file_content` akan dipanggil untuk membalik isi file tersebut. Jika terjadi error, fungsi ini akan mengembalikan nilai negatif dari errno.
 
+
 ```c
 static int fs_mkdir(const char *path, mode_t mode) {
     int result;
@@ -158,6 +167,7 @@ static int fs_mkdir(const char *path, mode_t mode) {
 }
 ```
 Fungsi `fs_mkdir` digunakan untuk membuat direktori baru dengan memanggil fungsi `mkdir`. Fungsi ini memanggil `get_full_path` untuk mendapatkan path lengkap
+
 
 ```c
 static int fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
@@ -186,6 +196,7 @@ static int fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t
 }
 ```
 Fungsi `fs_readdir` digunakan untuk membaca isi dari suatu direktori. Parameter path menyimpan path direktori yang akan dibaca, `buf` adalah buffer untuk menyimpan isi direktori, `filler` adalah fungsi callback dari FUSE untuk mengisi buffer dengan entry direktori, `offset` adalah offset untuk pembacaan direktori, dan `fi` adalah informasi file. Fungsi ini memanggil `get_full_path` untuk mendapatkan path lengkap direktori, kemudian membuka direktori dengan opendir. Setelah itu, fungsi ini membaca setiap entry direktori dengan `readdir` dan memanggil `filler` untuk mengisi buffer dengan informasi entry tersebut. Setelah selesai, direktori ditutup dengan `closedir`.
+
 
 ```c
 int reverse_file_content(const char *path) {
@@ -219,6 +230,7 @@ int reverse_file_content(const char *path) {
 }
 ```
 Fungsi `reverse_file_content` digunakan untuk membalik isi dari suatu file. Parameter path menyimpan path file yang akan dibalik isinya. Fungsi ini membuka file dengan mode `"r+"` (read and write) menggunakan `fopen`. Kemudian, fungsi ini menggunakan `fseek` dan `ftell` untuk mendapatkan panjang file. Setelah itu, fungsi mengalokasikan memori dinamis dengan `malloc` untuk menyimpan isi file, lalu membaca isi file dengan `fread`. Selanjutnya, fungsi membalik isi file dengan menukar posisi setiap karakter di dalam array content. Terakhir, fungsi menulis kembali isi file yang telah dibalik dengan `fwrite`, menutup file dengan `fclose`, dan membebaskan memori yang dialokasikan dengan free.
+
 
 ```c
 static int fs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
@@ -269,6 +281,7 @@ static int fs_read(const char *path, char *buf, size_t size, off_t offset, struc
 ```
 Fungsi `fs_read` digunakan untuk membaca isi dari suatu file. Parameter path menyimpan path file yang akan dibaca, `buf` adalah buffer untuk menyimpan isi file, `size` adalah ukuran maksimum data yang akan dibaca, `offset` adalah offset untuk pembacaan file, dan `fi` adalah informasi file. Fungsi ini memanggil `get_full_path` untuk mendapatkan path lengkap file, kemudian membuka file dengan mode `O_RDONLY` (read only) menggunakan `open`. Jika path diawali dengan `/bahaya/test`, maka fungsi akan membaca seluruh isi file, membalik isinya, dan menyalin isi file yang telah dibalik ke buffer `buf`. Jika bukan, fungsi akan membaca isi file secara normal dengan `pread`. Setelah selesai, file ditutup dengan `close`.
 
+
 ```c
 static struct fuse_operations fs_operations = {
     .getattr = fs_getattr,
@@ -282,6 +295,7 @@ static struct fuse_operations fs_operations = {
 ```
 Mendefinisikan struktur `fuse_operations` yang berisi pointer ke fungsi-fungsi yang diimplementasikan dalam program ini, seperti `fs_getattr`, `fs_chmod`, `fs_rename`, `fs_write`, `fs_mkdir`, `fs_readdir`, dan `fs_read`. Struktur ini diperlukan oleh FUSE untuk mengakses implementasi operasi filesystem yang disediakan oleh program ini.
 
+
 ```c
 int main(int argc, char *argv[]) {
     return fuse_main(argc, argv, &fs_operations, NULL);
@@ -289,6 +303,7 @@ int main(int argc, char *argv[]) {
 ```
 Memanggil `fuse_main` dengan argument `argc` dan `argv` yang diterima dari command line, serta menyertakan pointer ke struktur `fs_operations` yang telah didefinisikan sebelumnya. Fungsi `fuse_main` akan menginisialisasi FUSE dan menjalankan operasi filesystem yang telah ditentukan dalam `fs_operations`.
 
+Kemudian kita compile menggunakan `
 ## Dokumentasi Output
 
 

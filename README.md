@@ -315,6 +315,295 @@ Setelah kita cek folder `gallery` kita pindah ke folder `bahaya`. Disitu kita ce
 ![Screenshot from 2024-05-24 22-44-11](https://github.com/agnesgriselda/Sisop-4-2024-MH-IT10/assets/150429708/f3f00957-a971-4ca5-94fa-7a609fe826ef)
 ![Screenshot from 2024-05-24 22-44-26](https://github.com/agnesgriselda/Sisop-4-2024-MH-IT10/assets/150429708/d6c0c5c6-58df-4d8b-a35f-9cbb66d3b0ba)
 
+## Soal 2 
+Masih dengan Ini Karya Kita, sang CEO ingin melakukan tes keamanan pada folder sensitif Ini Karya Kita. Karena Teknologi Informasi merupakan departemen dengan salah satu fokus di Cyber Security, maka dia kembali meminta bantuan mahasiswa Teknologi Informasi angkatan 2023 untuk menguji dan mengatur keamanan pada folder sensitif tersebut. Untuk mendapatkan folder sensitif itu, mahasiswa IT 23 harus kembali mengunjungi website Ini Karya Kita pada www.inikaryakita.id/schedule . Silahkan isi semua formnya, tapi pada form subject isi dengan nama kelompok_SISOP24 , ex: IT01_SISOP24 . Lalu untuk form Masukkan Pesanmu, ketik “Mau Foldernya” . Tunggu hingga 1x24 jam, maka folder sensitif tersebut akan dikirimkan melalui email kalian. Apabila folder tidak dikirimkan ke email kalian, maka hubungi sang CEO untuk meminta bantuan.   
+Pada folder "pesan" Adfi ingin meningkatkan kemampuan sistemnya dalam mengelola berkas-berkas teks dengan menggunakan fuse.
+Jika sebuah file memiliki prefix "base64," maka sistem akan langsung mendekode isi file tersebut dengan algoritma Base64.
+Jika sebuah file memiliki prefix "rot13," maka isi file tersebut akan langsung di-decode dengan algoritma ROT13.
+Jika sebuah file memiliki prefix "hex," maka isi file tersebut akan langsung di-decode dari representasi heksadesimalnya.
+Jika sebuah file memiliki prefix "rev," maka isi file tersebut akan langsung di-decode dengan cara membalikkan teksnya.
+
+Pada folder “rahasia-berkas”, Adfi dan timnya memutuskan untuk menerapkan kebijakan khusus. Mereka ingin memastikan bahwa folder dengan prefix "rahasia" tidak dapat diakses tanpa izin khusus. 
+Jika seseorang ingin mengakses folder dan file pada “rahasia”, mereka harus memasukkan sebuah password terlebih dahulu (password bebas). 
+Setiap proses yang dilakukan akan tercatat pada logs-fuse.log dengan format :
+[SUCCESS/FAILED]::dd/mm/yyyy-hh:mm:ss::[tag]::[information]
+Ex:
+[SUCCESS]::01/11/2023-10:43:43::[moveFile]::[File moved successfully]
+
+## Penyelesaian 
+# 1. Konfigurasikan Google Drive ke Linux menggunakan mount
+Bisa memanfaatkan penggunaan remote dengan konfigurasi terlebih dahulu yaitu 
+```
+rclone config
+```
+lalu ikuti tiap langkah dengan memilih pilihan yang memiliki keterangan default 
+lalu jika sudah kita akan diarahkan ke browser dan memilih akun email google drive
+untuk menyelesaikan konfigurasi gunakan ini 
+```
+rclone mount nafi: /mnt/my_drive --vfs-cache-mode full
+```
+Setelah itu bisa buka terminal baru dan google drive akan bisa diakses pada folder yang dijadikan mount point 
+
+# 2. Define Fuse version dan Declare Library yang dibutuhkan 
+```
+#define FUSE_USE_VERSION 31
+#include <fuse3/fuse.h>
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <time.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <openssl/bio.h>
+#include <openssl/evp.h>
+#include <openssl/buffer.h>
+#include <dirent.h>
+```
+# 3. Buat Fungsi untuk Logging 
+```
+void log_event(const char *status, const char *tag, const char *info) {
+    FILE *log_file = fopen("/home/nafi/logs-fuse.log", "a");
+    if (log_file) {
+        time_t now = time(NULL);
+        struct tm *t = localtime(&now);
+        char time_str[20];
+        strftime(time_str, sizeof(time_str), "%d/%m/%Y-%H:%M:%S", t);
+        fprintf(log_file, "[%s]::%s::[%s]::[%s]\n", status, time_str, tag, info);
+        fclose(log_file);
+    } else {
+        perror("Failed to open log file");
+    }
+}
+```
+# 4. Buat Logika untuk Decode File 
+# Base64
+```
+char *base64_decode(const char *data) {
+    BIO *bio, *b64;
+    int decodeLen = strlen(data);
+    char *buffer = (char *)malloc(decodeLen + 1); // +1 for null terminator
+
+    if (!buffer) {
+        return NULL;
+    }
+
+    FILE *stream = fmemopen((void *)data, strlen(data), "r");
+    b64 = BIO_new(BIO_f_base64());
+    bio = BIO_new_fp(stream, BIO_NOCLOSE);
+    bio = BIO_push(b64, bio);
+
+    int len = BIO_read(bio, buffer, decodeLen);
+    buffer[len] = '\0';
+
+    BIO_free_all(bio);
+    fclose(stream);
+
+    return buffer;
+}
+```
+# rot13
+```
+void rot13_decode(char *data) {
+    char c;
+    while ((c = *data) != '\0') {
+        if (c >= 'A' && c <= 'Z') {
+            *data = 'A' + (c - 'A' + 13) % 26;
+        } else if (c >= 'a' && c <= 'z') {
+            *data = 'a' + (c - 'a' + 13) % 26;
+        }
+        data++;
+    }
+}
+```
+# hexdecode
+```
+char *hex_decode(const char *data) {
+    size_t len = strlen(data) / 2;
+    char *buffer = (char *)malloc(len + 1);
+    if (!buffer) {
+        return NULL;
+    }
+
+    for (size_t i = 0; i < len; i++) {
+        sscanf(data + 2*i, "%2hhx", &buffer[i]);
+    }
+    buffer[len] = '\0';
+    return buffer;
+}
+```
+# reversedecode
+```
+void reverse_decode(char *data) {
+    int len = strlen(data);
+    for (int i = 0; i < len / 2; i++) {
+        char temp = data[i];
+        data[i] = data[len - i - 1];
+        data[len - i - 1] = temp;
+    }
+}
+```
+# 5. Buat global password untuk folder rahasia-berkas
+```
+char *password = "inikaryakita";
+
+static int xmp_getattr(const char *path, struct stat *stbuf, struct fuse_file_info *fi) {
+    int res;
+    char fpath[PATH_MAX];
+    sprintf(fpath, "/home/nafi/sensitif%s", path);
+    res = lstat(fpath, stbuf);
+    if (res == -1) return -errno;
+    log_event("SUCCESS", "getattr", fpath);
+    return 0;
+}
+```
+# 6. Kode untuk Validasi password dan fungsi open pada fuse
+```
+static int xmp_open(const char *path, struct fuse_file_info *fi) {
+    int res;
+    char fpath[PATH_MAX];
+    sprintf(fpath, "/home/nafi/sensitif%s", path);
+
+    if (strstr(path, "/rahasia-berkas/") != NULL) {
+        char input_password[256];
+        printf("Enter password to access %s: ", path);
+        scanf("%255s", input_password);
+
+        if (strcmp(input_password, password) != 0) {
+            log_event("FAILED", "open", fpath);
+            return -EACCES;
+        }
+    }
+
+    res = open(fpath, fi->flags);
+    if (res == -1) {
+        log_event("FAILED", "open", fpath);
+        return -errno;
+    }
+    close(res);
+    log_event("SUCCESS", "open", fpath);
+    return 0;
+}
+```
+# 7. Membuat Fungsi Read dan Decode 
+```
+static int xmp_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
+    int fd;
+    int res;
+    char fpath[PATH_MAX];
+    sprintf(fpath, "/home/nafi/sensitif%s", path);
+
+    fd = open(fpath, O_RDONLY);
+    if (fd == -1) return -errno;
+
+    struct stat st;
+    fstat(fd, &st);
+    size_t file_size = st.st_size;
+
+    char *read_buf = (char *)malloc(file_size + 1);
+    if (!read_buf) {
+        close(fd);
+        return -ENOMEM;
+    }
+
+    res = pread(fd, read_buf, file_size, 0);
+    if (res == -1) {
+        free(read_buf);
+        close(fd);
+        return -errno;
+    }
+    read_buf[file_size] = '\0';
+
+    char *decoded = NULL;
+    if (strstr(path, "base64_") == path) {
+        decoded = base64_decode(read_buf);
+    } else if (strstr(path, "rot13_") == path) {
+        rot13_decode(read_buf);
+        decoded = read_buf;
+    } else if (strstr(path, "hex_") == path) {
+        decoded = hex_decode(read_buf);
+    } else if (strstr(path, "rev_") == path) {
+        reverse_decode(read_buf);
+        decoded = read_buf;
+} else {
+        decoded = read_buf;
+    }
+
+    if (decoded) {
+        strncpy(buf, decoded, size);
+        if (decoded != read_buf) {
+            free(decoded);
+        }
+    } else {
+        free(read_buf);
+        close(fd);
+        return -EINVAL;
+    }
+
+    free(read_buf);
+    close(fd);
+
+    log_event("SUCCESS", "read", fpath);
+    return size;
+}
+```
+# 8. Membuat Fungsi untuk membaca direktori 
+```
+static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi, enum fuse_readdir_flags flags) {
+    char fpath[PATH_MAX];
+    if (strcmp(path, "/") == 0) {
+        sprintf(fpath, "/home/nafi/sensitif");
+    } else {
+        sprintf(fpath, "/home/nafi/sensitif%s", path);
+    }
+
+    DIR *dp;
+    struct dirent *de;
+
+    dp = opendir(fpath);
+    if (dp == NULL) return -errno;
+
+    while ((de = readdir(dp)) != NULL) {
+        struct stat st;
+        memset(&st, 0, sizeof(st));
+        st.st_ino = de->d_ino;
+        st.st_mode = de->d_type << 12;
+        if (filler(buf, de->d_name, &st, 0, 0)) break;
+    }
+
+    closedir(dp);
+    log_event("SUCCESS", "readdir", fpath);
+    return 0;
+}
+```
+# 9. Mengumpulkan fungsi yang telah dibuat untuk operasi fuse 
+```
+static struct fuse_operations xmp_oper = {
+    .getattr    = xmp_getattr,
+    .open       = xmp_open,
+    .read       = xmp_read,
+    .readdir    = xmp_readdir,
+};
+```
+# 10. Fungsi Main 
+```
+nt main(int argc, char *argv[]) {
+umask(0);
+    return fuse_main(argc, argv, &xmp_oper, NULL);
+}
+```
+## Revisi 
+1. Memperbaiki Direktori
+2. Memperbaiki logging file
+3. Menjalankan Kode untuk decode dan password rahasia-berkas (Masih error) 
+## Output 
+![Untitled](https://github.com/agnesgriselda/Sisop-4-2024-MH-IT10/assets/144348985/24b5d578-08de-453e-afdd-b5a8986083ad)
+
+
+
+
+
 
 ## Soal 3
 Seorang arkeolog menemukan sebuah gua yang didalamnya tersimpan banyak relik dari zaman praaksara, sayangnya semua barang yang ada pada gua tersebut memiliki bentuk yang terpecah belah akibat bencana yang tidak diketahui. Sang arkeolog ingin menemukan cara cepat agar ia bisa menggabungkan relik-relik yang terpecah itu, namun karena setiap pecahan relik itu masih memiliki nilai tersendiri, ia memutuskan untuk membuat sebuah file system yang mana saat ia mengakses file system tersebut ia dapat melihat semua relik dalam keadaan utuh, sementara relik yang asli tidak berubah sama sekali.

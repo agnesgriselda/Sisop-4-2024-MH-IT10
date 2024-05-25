@@ -741,4 +741,107 @@ int main(int argc, char *argv[]) {
 
 ## Dokumentasi Output
 
+
 ## Revisi
+
+Fungsi untuk membaca relics yang akan digabungkan :
+```c
+static int arch_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
+    (void) fi;
+    size_t len;
+    char fpath[1000];
+    snprintf(fpath, sizeof(fpath), "%s%s", root_path, path);
+
+    int i = 0;
+    char part_path[1100];
+    size_t read_size = 0;
+
+    while (size > 0) {
+        snprintf(part_path, sizeof(part_path), "%s.%03d", fpath, i++);
+        FILE *fp = fopen(part_path, "rb");
+        if (!fp) break;
+
+        fseek(fp, 0L, SEEK_END);
+        size_t part_size = ftell(fp);
+        fseek(fp, 0L, SEEK_SET);
+
+        if (offset >= part_size) {
+            offset -= part_size;
+            fclose(fp);
+            continue;
+        }
+
+        fseek(fp, offset, SEEK_SET);
+        len = fread(buf, 1, size, fp);
+        fclose(fp);
+
+        buf += len;
+        size -= len;
+        read_size += len;
+        offset = 0;
+    }
+    return read_size;
+}
+```
+Fungsi untuk menghapus relics dan seluruh pecahannya apabila dibuat sample image baru :
+```c
+static int arch_unlink(const char *path) {
+    char fpath[1000];
+    snprintf(fpath, sizeof(fpath), "%s%s", root_path, path);
+
+    int part_num = 0;
+    char part_path[1100];
+    int res = 0;
+
+    while (1) {
+        snprintf(part_path, sizeof(part_path), "%s.%03d", fpath, part_num++);
+        res = unlink(part_path);
+        if (res == -1 && errno == ENOENT) break;
+        else if (res == -1) return -errno;
+    }
+    return 0;
+}
+```
+Fungsi untuk membuat sample image baru :
+```c
+
+static int arch_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
+    (void) fi;
+    char fpath[1000];
+    snprintf(fpath, sizeof(fpath), "%s%s.000", root_path, path);
+
+    int res = creat(fpath, mode);
+    if (res == -1) return -errno;
+
+    close(res);
+    return 0;
+}
+```
+Fungsi untuk adjust relics pecahan maupun relics yang sudah digabungkan :
+```c
+static int arch_truncate(const char *path, off_t size) {
+    char fpath[1000];
+    snprintf(fpath, sizeof(fpath), "%s%s", root_path, path);
+
+    int part_num = 0;
+    char part_path[1100];
+    off_t remaining_size = size;
+
+    while (remaining_size > 0) {
+        snprintf(part_path, sizeof(part_path), "%s.%03d", fpath, part_num++);
+        size_t part_size = remaining_size > 10000 ? 10000 : remaining_size;
+        int res = truncate(part_path, part_size);
+        if (res == -1) return -errno;
+        remaining_size -= part_size;
+    }
+
+    while (1) {
+        snprintf(part_path, sizeof(part_path), "%s.%03d", fpath, part_num++);
+        int res = unlink(part_path);
+        if (res == -1 && errno == ENOENT) break;
+        else if (res == -1) return -errno;
+    }
+
+    return 0;
+}
+```

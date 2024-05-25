@@ -740,6 +740,14 @@ int main(int argc, char *argv[]) {
 ```
 
 ## Dokumentasi Output
+![Screenshot 2024-05-25 092917](https://github.com/agnesgriselda/Sisop-4-2024-MH-IT10/assets/150202762/9e07d4a5-7a7e-4a3f-85c3-24e7ac229073)
+
+![Screenshot 2024-05-24 090426](https://github.com/agnesgriselda/Sisop-4-2024-MH-IT10/assets/150202762/6880a560-0ed0-45da-95b9-14274a0b2ffd)
+
+
+![Screenshot 2024-05-25 093039](https://github.com/agnesgriselda/Sisop-4-2024-MH-IT10/assets/150202762/b16bde5f-95d8-40f8-a73e-0e735d188854)
+
+![Screenshot 2024-05-25 093012](https://github.com/agnesgriselda/Sisop-4-2024-MH-IT10/assets/150202762/29df95a1-c480-4986-9f77-de8be3a3b71c)
 
 
 ## Revisi
